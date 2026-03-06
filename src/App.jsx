@@ -364,6 +364,9 @@ Maintain narrative consistency. Raise stakes. Honor the player's choice.`;
                         </span>
                       </div>
                       <div className="lib-card-sub">Chapter {entry.chapter} · Saved {formatDate(entry.savedAt)}</div>
+                      <div className="lib-card-preview">
+                        {(entry.history[0]?.passage || entry.current.passage).slice(0, 220).trimEnd()}…
+                      </div>
                     </div>
                     <div className="lib-card-actions">
                       <button className="lib-continue-btn" onClick={() => loadStory(entry)}>

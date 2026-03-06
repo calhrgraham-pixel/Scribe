@@ -398,6 +398,25 @@ html, body {
   letter-spacing: 0.3px;
 }
 
+.lib-card-preview {
+  font-size: 13px;
+  line-height: 1.65;
+  color: #7a5a30;
+  font-style: italic;
+  font-weight: 300;
+  margin-top: 0;
+  max-height: 0;
+  overflow: hidden;
+  opacity: 0;
+  transition: max-height 0.35s ease, opacity 0.3s ease, margin-top 0.3s ease;
+}
+
+.lib-card:hover .lib-card-preview {
+  max-height: 120px;
+  opacity: 1;
+  margin-top: 12px;
+}
+
 .lib-card-actions {
   display: flex;
   align-items: center;

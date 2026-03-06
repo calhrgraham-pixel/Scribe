@@ -41,6 +41,7 @@ async function callClaude(messages, systemPrompt) {
 export default function App() {
   const [screen, setScreen]           = useState("setup");
   const [config, setConfig]           = useState({ genre: "", theme: "", tone: "", scope: "", extra: "" });
+  const [storyOptions, setStoryOptions] = useState([]);
   const [storyTitle, setStoryTitle]   = useState("");
   const [chapter, setChapter]         = useState(0);
   const [history, setHistory]         = useState([]);
@@ -78,7 +79,21 @@ export default function App() {
     }
   };
 
-  const buildOpeningSystem = () =>
+  const buildPickerSystem = () =>
+    `You are a master storyteller. Based on the story parameters, generate exactly 3 distinct story concepts.
+You MUST respond ONLY with valid JSON — no preamble, no markdown fences, no explanation.
+Return exactly this shape:
+{
+  "stories": [
+    { "title": "Evocative title (2-6 words)", "synopsis": "A compelling 2-3 sentence synopsis hinting at the premise, protagonist, and central conflict." },
+    { "title": "...", "synopsis": "..." },
+    { "title": "...", "synopsis": "..." }
+  ]
+}
+Story parameters: Genre=${config.genre}, Theme="${config.theme || "open"}", Tone=${config.tone}, Scope=${config.scope}.${config.extra ? ` Extra context: ${config.extra}` : ""}
+Make each concept feel meaningfully different — vary settings, protagonists, or central conflicts. Each should feel exciting and distinct.`;
+
+  const buildOpeningSystem = (concept) =>
     `You are a master storyteller crafting an immersive, literary choose-your-own-adventure story.
 You MUST respond ONLY with valid JSON — no preamble, no markdown fences, no explanation.
 Return exactly this shape:
@@ -88,7 +103,7 @@ Return exactly this shape:
   "choices": ["Choice A (10-20 words)", "Choice B (10-20 words)", "Choice C (10-20 words)"],
   "isEnding": false
 }
-Story parameters: Genre=${config.genre}, Theme="${config.theme || "open"}", Tone=${config.tone}, Scope=${config.scope}.${config.extra ? ` Extra context: ${config.extra}` : ""}
+Story parameters: Genre=${config.genre}, Theme="${config.theme || "open"}", Tone=${config.tone}, Scope=${config.scope}.${config.extra ? ` Extra context: ${config.extra}` : ""}${concept ? `\nChosen story concept — Title: "${concept.title}". Synopsis: "${concept.synopsis}". Build the opening passage faithfully from this concept.` : ""}
 Write with literary quality. Vary sentence rhythm. Be specific and sensory. Make choices feel genuinely consequential.`;
 
   const buildContinueSystem = () =>
@@ -103,7 +118,32 @@ Respond ONLY with valid JSON:
 If this feels like a natural story ending (after ~5-8 choices, or if the narrative naturally concludes), set isEnding: true and omit choices. Write an emotionally resonant closing passage (150-200 words).
 Maintain narrative consistency. Raise stakes. Honor the player's choice.`;
 
-  const beginStory = async () => {
+  const generateOptions = async () => {
+    setError("");
+    setScreen("loading");
+    const msgs = ["Summoning story concepts…", "Consulting the ancient tomes…", "Three paths diverge before you…", "The ink stirs with possibility…"];
+    let mi = 0;
+    setLoadingMsg(msgs[mi]);
+    const interval = setInterval(() => { mi = (mi + 1) % msgs.length; setLoadingMsg(msgs[mi]); }, 1800);
+
+    try {
+      const raw = await callClaude(
+        [{ role: "user", content: "Generate 3 distinct story concepts based on the parameters." }],
+        buildPickerSystem()
+      );
+      clearInterval(interval);
+      const parsed = parseStoryResponse(raw);
+      if (!parsed?.stories?.length) throw new Error("Could not generate story options.");
+      setStoryOptions(parsed.stories);
+      setScreen("picker");
+    } catch (e) {
+      clearInterval(interval);
+      setError(e.message || "Something went wrong. Please try again.");
+      setScreen("setup");
+    }
+  };
+
+  const startChosenStory = async (concept) => {
     setError("");
     setScreen("loading");
     const msgs = ["Consulting the ancient tomes…", "Weaving the threads of fate…", "The ink begins to flow…", "Your story stirs to life…"];
@@ -114,12 +154,12 @@ Maintain narrative consistency. Raise stakes. Honor the player's choice.`;
     try {
       const raw = await callClaude(
         [{ role: "user", content: "Begin the story. Write the opening passage." }],
-        buildOpeningSystem()
+        buildOpeningSystem(concept)
       );
       clearInterval(interval);
       const parsed = parseStoryResponse(raw);
       if (!parsed) throw new Error("Could not parse story response.");
-      setStoryTitle(parsed.title || "Your Story");
+      setStoryTitle(parsed.title || concept.title || "Your Story");
       setCurrent(parsed);
       setChapter(1);
       setHistory([]);
@@ -128,7 +168,7 @@ Maintain narrative consistency. Raise stakes. Honor the player's choice.`;
     } catch (e) {
       clearInterval(interval);
       setError(e.message || "Something went wrong. Please try again.");
-      setScreen("setup");
+      setScreen("picker");
     }
   };
 
@@ -172,6 +212,7 @@ Maintain narrative consistency. Raise stakes. Honor the player's choice.`;
     setDisplayedText("");
     setChapter(0);
     setStoryTitle("");
+    setStoryOptions([]);
     setError("");
   };
 
@@ -232,7 +273,7 @@ Maintain narrative consistency. Raise stakes. Honor the player's choice.`;
                   <textarea id="extra" className="field-textarea" placeholder="Describe a character, setting, specific premise, or anything else to shape your tale…" value={config.extra} onChange={e => update("extra", e.target.value)} />
                 </div>
               </div>
-              <button className="begin-btn" onClick={beginStory} disabled={!canBegin}>
+              <button className="begin-btn" onClick={generateOptions} disabled={!canBegin}>
                 Begin Your Story
               </button>
             </div>
@@ -244,6 +285,34 @@ Maintain narrative consistency. Raise stakes. Honor the player's choice.`;
           <div className="loading-wrap">
             <div className="rune-spinner" />
             <div className="loading-text">{loadingMsg}</div>
+          </div>
+        )}
+
+        {/* ── STORY PICKER ── */}
+        {screen === "picker" && (
+          <div className="title-screen">
+            <div className="title-ornament">✦ ✦ ✦</div>
+            <h1 className="title-main">Scribe</h1>
+            <p className="title-sub">Choose Your Path</p>
+
+            {error && <div className="error-banner">{error}</div>}
+
+            <p className="picker-prompt">Three tales await. Which calls to you?</p>
+
+            <div className="story-options">
+              {storyOptions.map((option, i) => (
+                <button key={i} className="story-option-card" onClick={() => startChosenStory(option)}>
+                  <div className="option-number">{["I", "II", "III"][i]}</div>
+                  <div className="option-body">
+                    <div className="option-title">{option.title}</div>
+                    <div className="option-synopsis">{option.synopsis}</div>
+                  </div>
+                  <div className="option-arrow">›</div>
+                </button>
+              ))}
+            </div>
+
+            <button className="back-btn" onClick={() => setScreen("setup")}>← Back to Settings</button>
           </div>
         )}
 

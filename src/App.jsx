@@ -14,6 +14,10 @@ const STARS = Array.from({ length: 80 }, (_, i) => ({
   size: Math.random() > 0.8 ? 3 : 2,
 }));
 
+function formatDate(iso) {
+  return new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+}
+
 function parseStoryResponse(raw) {
   const clean = (raw || "").replace(/```json|```/g, "").trim();
   const jsonMatch = clean.match(/\{[\s\S]*\}/);
@@ -50,6 +54,11 @@ export default function App() {
   const [typing, setTyping]           = useState(false);
   const [loadingMsg, setLoadingMsg]   = useState("Weaving your tale…");
   const [error, setError]             = useState("");
+  const [library, setLibrary]         = useState(() => {
+    try { return JSON.parse(localStorage.getItem("scribe_library") || "[]"); } catch { return []; }
+  });
+  const [currentStoryId, setCurrentStoryId] = useState(null);
+  const [savedFlash, setSavedFlash]   = useState(false);
   const typingRef = useRef(null);
 
   const update = (k, v) => setConfig(c => ({ ...c, [k]: v }));
@@ -163,6 +172,7 @@ Maintain narrative consistency. Raise stakes. Honor the player's choice.`;
       setCurrent(parsed);
       setChapter(1);
       setHistory([]);
+      setCurrentStoryId(Date.now().toString());
       setScreen("story");
       typeText(parsed.passage);
     } catch (e) {
@@ -203,6 +213,42 @@ Maintain narrative consistency. Raise stakes. Honor the player's choice.`;
     }
   };
 
+  const saveStory = () => {
+    const id = currentStoryId || Date.now().toString();
+    if (!currentStoryId) setCurrentStoryId(id);
+    const entry = { id, title: storyTitle, savedAt: new Date().toISOString(), chapter, config, history, current, isComplete: screen === "ending" };
+    setLibrary(prev => {
+      const next = [entry, ...prev.filter(e => e.id !== id)];
+      localStorage.setItem("scribe_library", JSON.stringify(next));
+      return next;
+    });
+    setSavedFlash(true);
+    setTimeout(() => setSavedFlash(false), 2000);
+  };
+
+  const deleteStory = (id) => {
+    setLibrary(prev => {
+      const next = prev.filter(e => e.id !== id);
+      localStorage.setItem("scribe_library", JSON.stringify(next));
+      return next;
+    });
+  };
+
+  const loadStory = (entry) => {
+    clearInterval(typingRef.current);
+    setCurrentStoryId(entry.id);
+    setStoryTitle(entry.title);
+    setConfig(entry.config);
+    setHistory(entry.history);
+    setCurrent(entry.current);
+    setChapter(entry.chapter);
+    setDisplayedText(entry.current.passage);
+    setTyping(false);
+    setStoryOptions([]);
+    setError("");
+    setScreen(entry.isComplete ? "ending" : "story");
+  };
+
   const restart = () => {
     clearInterval(typingRef.current);
     setScreen("setup");
@@ -213,6 +259,8 @@ Maintain narrative consistency. Raise stakes. Honor the player's choice.`;
     setChapter(0);
     setStoryTitle("");
     setStoryOptions([]);
+    setCurrentStoryId(null);
+    setSavedFlash(false);
     setError("");
   };
 
@@ -237,6 +285,12 @@ Maintain narrative consistency. Raise stakes. Honor the player's choice.`;
             <div className="title-ornament">✦ ✦ ✦</div>
             <h1 className="title-main">Scribe</h1>
             <p className="title-sub">AI-Powered Adventure</p>
+
+            {library.length > 0 && (
+              <button className="library-btn" onClick={() => setScreen("library")}>
+                ✦ My Library ({library.length})
+              </button>
+            )}
 
             {error && <div className="error-banner">{error}</div>}
 
@@ -288,6 +342,44 @@ Maintain narrative consistency. Raise stakes. Honor the player's choice.`;
           </div>
         )}
 
+        {/* ── LIBRARY ── */}
+        {screen === "library" && (
+          <div className="title-screen">
+            <div className="title-ornament">✦ ✦ ✦</div>
+            <h1 className="title-main">Scribe</h1>
+            <p className="title-sub">Your Library</p>
+
+            {library.length === 0 ? (
+              <p className="lib-empty">Your scrolls are empty. Save a story to find it here.</p>
+            ) : (
+              <div className="lib-list">
+                {library.map(entry => (
+                  <div key={entry.id} className="lib-card">
+                    <div className="lib-card-body">
+                      <div className="lib-card-title">{entry.title}</div>
+                      <div className="lib-card-meta">
+                        {entry.config.genre} · {entry.config.tone}
+                        <span className={`lib-status ${entry.isComplete ? "complete" : "progress"}`}>
+                          {entry.isComplete ? "Complete" : "In Progress"}
+                        </span>
+                      </div>
+                      <div className="lib-card-sub">Chapter {entry.chapter} · Saved {formatDate(entry.savedAt)}</div>
+                    </div>
+                    <div className="lib-card-actions">
+                      <button className="lib-continue-btn" onClick={() => loadStory(entry)}>
+                        {entry.isComplete ? "Read Again" : "Continue →"}
+                      </button>
+                      <button className="lib-delete-btn" onClick={() => deleteStory(entry.id)}>✕</button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <button className="back-btn" onClick={() => setScreen("setup")}>← Back to Setup</button>
+          </div>
+        )}
+
         {/* ── STORY PICKER ── */}
         {screen === "picker" && (
           <div className="title-screen">
@@ -325,6 +417,7 @@ Maintain narrative consistency. Raise stakes. Honor the player's choice.`;
                 <div className="chapter-badge">
                   {screen === "ending" ? `The End · ${chapter} Chapters` : `Chapter ${chapter}`}
                 </div>
+                <button className="save-btn" onClick={saveStory}>{savedFlash ? "Saved ✓" : "Save"}</button>
                 <button className="restart-btn" onClick={restart}>✕ Restart</button>
               </div>
             </div>
@@ -374,7 +467,10 @@ Maintain narrative consistency. Raise stakes. Honor the player's choice.`;
                 <div className="ending-ornament">✦ ✦ ✦</div>
                 <div className="ending-title">Your Story is Complete</div>
                 <div className="ending-sub">A tale {chapter} chapters long, shaped by your choices alone.</div>
-                <button className="play-again-btn" onClick={restart}>Begin a New Story</button>
+                <div className="ending-btns">
+                  <button className="save-library-btn" onClick={saveStory}>{savedFlash ? "Saved ✓" : "Save to Library"}</button>
+                  <button className="play-again-btn" onClick={restart}>Begin a New Story</button>
+                </div>
               </div>
             )}
           </>

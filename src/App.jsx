@@ -5,6 +5,22 @@ const GENRE_OPTIONS = ["Fantasy", "Science Fiction", "Horror", "Mystery", "Roman
 const TONE_OPTIONS  = ["Epic & Heroic", "Dark & Gritty", "Whimsical & Light", "Tense & Suspenseful", "Melancholic & Poetic", "Humorous & Satirical", "Romantic & Lyrical", "Cold & Cerebral"];
 const SCOPE_OPTIONS = ["A single fateful night", "A short journey (days)", "A grand quest (weeks)", "An epic saga (years)", "A single conversation"];
 
+const NAMING_STYLES = [
+  "Norse/Viking — names like Björn, Sigrid, Halvard; places like Ironfjord, Greyspire",
+  "Arabic/Persian — names like Tariq, Yasmin, Khalid; places like Qasr al-Rih, the Amber Road",
+  "East Asian/Japanese — names like Kenji, Yuki, Haruto; places like Shiro Keep, Kurayami Pass",
+  "Celtic/Gaelic — names like Caoimhe, Fergus, Oisín; places like Dún Cragach, the Pale Moors",
+  "Slavic — names like Mira, Vasil, Zoran; places like Volkovgrad, the Kravchin Vale",
+  "West African — names like Amara, Kofi, Adisa; places like Osei's Landing, the Red Basin",
+  "Mediterranean/Roman — names like Marco, Livia, Dario; places like Castra Ventus, Porto Argento",
+  "South Asian — names like Arjun, Priya, Vikram; places like Ashvapur, the Dust Roads",
+  "Mesoamerican-inspired — names like Citlali, Itzel, Tezoc; places like Tlachco, the Jade Cliffs",
+  "Purely invented/alien — made-up sounds with no real-world basis, e.g. Zeth, Aelith, Vorkan; places like the Drifting Spires, Neth",
+  "Ancient Egyptian/North African — names like Khepri, Nefara, Amentu; places like Sakhara, the Gilded Delta",
+  "Maritime/Age of Sail — names like Silas, Maren, Cutter; places like Port Sorrow, the Wailing Straits",
+  "Baroque/Central European — names like Casimir, Elzbieta, Radovan; places like Volgrath Keep, the Iron Marches",
+];
+
 const STARS = Array.from({ length: 80 }, (_, i) => ({
   id: i,
   top: Math.random() * 100,
@@ -61,6 +77,7 @@ export default function App() {
   const [savedFlash, setSavedFlash]   = useState(false);
   const [worldState, setWorldState]   = useState({ protagonist: "", setting: "", facts: [] });
   const typingRef = useRef(null);
+  const namingStyleRef = useRef("");
 
   const update = (k, v) => setConfig(c => ({ ...c, [k]: v }));
   const canBegin = config.genre && config.tone && config.scope;
@@ -101,7 +118,8 @@ Return exactly this shape:
   ]
 }
 Story parameters: Genre=${config.genre}, Theme="${config.theme || "open"}", Tone=${config.tone}, Scope=${config.scope}.${config.extra ? ` Extra context: ${config.extra}` : ""}
-Make each concept feel meaningfully different — vary settings, protagonists, or central conflicts. Each should feel exciting and distinct.`;
+Make each concept feel meaningfully different — vary settings, protagonists, or central conflicts. Each should feel exciting and distinct.
+Naming convention: ${namingStyleRef.current}. Apply this to all character and place names — avoid generic fantasy names like Aldric, Kael, Elara, or Thornwood.`;
 
   const buildOpeningSystem = (concept) =>
     `You are a master storyteller crafting an immersive, literary choose-your-own-adventure story.
@@ -119,6 +137,7 @@ Return exactly this shape:
   }
 }
 Story parameters: Genre=${config.genre}, Theme="${config.theme || "open"}", Tone=${config.tone}, Scope=${config.scope}.${config.extra ? ` Extra context: ${config.extra}` : ""}${concept ? `\nChosen story concept — Title: "${concept.title}". Synopsis: "${concept.synopsis}". Build the opening passage faithfully from this concept.` : ""}
+Naming convention: ${namingStyleRef.current}. All character and place names must follow this tradition — avoid generic fantasy names (Aldric, Kael, Elara, Thornwood, etc.).
 Write with literary quality. Vary sentence rhythm. Be specific and sensory. Make choices feel genuinely consequential.`;
 
   const buildContinueSystem = () => {
@@ -131,6 +150,7 @@ Write with literary quality. Vary sentence rhythm. Be specific and sensory. Make
 
     return `You are continuing an immersive choose-your-own-adventure story.
 Genre=${config.genre}, Tone=${config.tone}, Scope=${config.scope}.
+Naming convention: ${namingStyleRef.current}. Keep all names consistent with this tradition throughout.
 ${wsLines ? `Established world state — maintain strict consistency:\n${wsLines}\n` : ""}
 Respond ONLY with valid JSON:
 {
@@ -148,6 +168,7 @@ Maintain narrative consistency. Raise stakes. Honor the player's choice.`;
   };
 
   const generateOptions = async () => {
+    namingStyleRef.current = NAMING_STYLES[Math.floor(Math.random() * NAMING_STYLES.length)];
     setError("");
     setScreen("loading");
     const msgs = ["Summoning story concepts…", "Consulting the ancient tomes…", "Three paths diverge before you…", "The ink stirs with possibility…"];
@@ -238,7 +259,7 @@ Maintain narrative consistency. Raise stakes. Honor the player's choice.`;
   const saveStory = () => {
     const id = currentStoryId || Date.now().toString();
     if (!currentStoryId) setCurrentStoryId(id);
-    const entry = { id, title: storyTitle, savedAt: new Date().toISOString(), chapter, config, history, current, worldState, isComplete: screen === "ending" };
+    const entry = { id, title: storyTitle, savedAt: new Date().toISOString(), chapter, config, history, current, worldState, namingStyle: namingStyleRef.current, isComplete: screen === "ending" };
     setLibrary(prev => {
       const next = [entry, ...prev.filter(e => e.id !== id)];
       localStorage.setItem("scribe_library", JSON.stringify(next));
@@ -266,6 +287,7 @@ Maintain narrative consistency. Raise stakes. Honor the player's choice.`;
     setChapter(entry.chapter);
     setDisplayedText(entry.current.passage);
     setTyping(false);
+    namingStyleRef.current = entry.namingStyle || "";
     setWorldState(entry.worldState || { protagonist: "", setting: "", facts: [] });
     setStoryOptions([]);
     setError("");
@@ -285,6 +307,7 @@ Maintain narrative consistency. Raise stakes. Honor the player's choice.`;
     setCurrentStoryId(null);
     setSavedFlash(false);
     setWorldState({ protagonist: "", setting: "", facts: [] });
+    namingStyleRef.current = "";
     setError("");
   };
 

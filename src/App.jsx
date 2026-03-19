@@ -31,7 +31,7 @@ async function callClaude(messages, systemPrompt) {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       model: "claude-sonnet-4-20250514",
-      max_tokens: 1000,
+      max_tokens: 1200,
       system: systemPrompt,
       messages,
     }),
@@ -59,6 +59,7 @@ export default function App() {
   });
   const [currentStoryId, setCurrentStoryId] = useState(null);
   const [savedFlash, setSavedFlash]   = useState(false);
+  const [worldState, setWorldState]   = useState({ protagonist: "", setting: "", facts: [] });
   const typingRef = useRef(null);
 
   const update = (k, v) => setConfig(c => ({ ...c, [k]: v }));
@@ -110,22 +111,41 @@ Return exactly this shape:
   "title": "Story title (evocative, 2-5 words)",
   "passage": "The narrative passage (200-280 words, richly descriptive, second-person 'you'). Use \\n\\n for paragraph breaks.",
   "choices": ["Choice A (10-20 words)", "Choice B (10-20 words)", "Choice C (10-20 words)"],
-  "isEnding": false
+  "isEnding": false,
+  "worldState": {
+    "protagonist": "One sentence: who the player character is as established in the opening",
+    "setting": "Current location and world name",
+    "facts": ["Up to 6 key facts: notable NPCs, items, threats, or plot points introduced"]
+  }
 }
 Story parameters: Genre=${config.genre}, Theme="${config.theme || "open"}", Tone=${config.tone}, Scope=${config.scope}.${config.extra ? ` Extra context: ${config.extra}` : ""}${concept ? `\nChosen story concept — Title: "${concept.title}". Synopsis: "${concept.synopsis}". Build the opening passage faithfully from this concept.` : ""}
 Write with literary quality. Vary sentence rhythm. Be specific and sensory. Make choices feel genuinely consequential.`;
 
-  const buildContinueSystem = () =>
-    `You are continuing an immersive choose-your-own-adventure story.
+  const buildContinueSystem = () => {
+    const ws = worldState;
+    const wsLines = [
+      ws.protagonist && `• Protagonist: ${ws.protagonist}`,
+      ws.setting     && `• Setting: ${ws.setting}`,
+      ...(ws.facts || []).map(f => `• ${f}`),
+    ].filter(Boolean).join("\n");
+
+    return `You are continuing an immersive choose-your-own-adventure story.
 Genre=${config.genre}, Tone=${config.tone}, Scope=${config.scope}.
+${wsLines ? `Established world state — maintain strict consistency:\n${wsLines}\n` : ""}
 Respond ONLY with valid JSON:
 {
   "passage": "Next narrative passage (200-280 words, second-person 'you', sensory and specific). \\n\\n for paragraph breaks.",
   "choices": ["Choice A (10-20 words)", "Choice B (10-20 words)", "Choice C (10-20 words)"],
-  "isEnding": false
+  "isEnding": false,
+  "worldState": {
+    "protagonist": "Repeat or update if something changed",
+    "setting": "Repeat or update if the location changed",
+    "facts": ["Updated list of up to 8 most important facts — add new ones, drop outdated ones"]
+  }
 }
 If this feels like a natural story ending (after ~5-8 choices, or if the narrative naturally concludes), set isEnding: true and omit choices. Write an emotionally resonant closing passage (150-200 words).
 Maintain narrative consistency. Raise stakes. Honor the player's choice.`;
+  };
 
   const generateOptions = async () => {
     setError("");
@@ -170,6 +190,7 @@ Maintain narrative consistency. Raise stakes. Honor the player's choice.`;
       if (!parsed) throw new Error("Could not parse story response.");
       setStoryTitle(parsed.title || concept.title || "Your Story");
       setCurrent(parsed);
+      if (parsed.worldState) setWorldState(parsed.worldState);
       setChapter(1);
       setHistory([]);
       setCurrentStoryId(Date.now().toString());
@@ -204,6 +225,7 @@ Maintain narrative consistency. Raise stakes. Honor the player's choice.`;
       const parsed = parseStoryResponse(raw);
       if (!parsed) throw new Error("Could not parse story response.");
       setCurrent(parsed);
+      if (parsed.worldState) setWorldState(parsed.worldState);
       setChapter(c => c + 1);
       setScreen(parsed.isEnding ? "ending" : "story");
       typeText(parsed.passage);
@@ -216,7 +238,7 @@ Maintain narrative consistency. Raise stakes. Honor the player's choice.`;
   const saveStory = () => {
     const id = currentStoryId || Date.now().toString();
     if (!currentStoryId) setCurrentStoryId(id);
-    const entry = { id, title: storyTitle, savedAt: new Date().toISOString(), chapter, config, history, current, isComplete: screen === "ending" };
+    const entry = { id, title: storyTitle, savedAt: new Date().toISOString(), chapter, config, history, current, worldState, isComplete: screen === "ending" };
     setLibrary(prev => {
       const next = [entry, ...prev.filter(e => e.id !== id)];
       localStorage.setItem("scribe_library", JSON.stringify(next));
@@ -244,6 +266,7 @@ Maintain narrative consistency. Raise stakes. Honor the player's choice.`;
     setChapter(entry.chapter);
     setDisplayedText(entry.current.passage);
     setTyping(false);
+    setWorldState(entry.worldState || { protagonist: "", setting: "", facts: [] });
     setStoryOptions([]);
     setError("");
     setScreen(entry.isComplete ? "ending" : "story");
@@ -261,6 +284,7 @@ Maintain narrative consistency. Raise stakes. Honor the player's choice.`;
     setStoryOptions([]);
     setCurrentStoryId(null);
     setSavedFlash(false);
+    setWorldState({ protagonist: "", setting: "", facts: [] });
     setError("");
   };
 

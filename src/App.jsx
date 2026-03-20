@@ -76,6 +76,7 @@ export default function App() {
   const [currentStoryId, setCurrentStoryId] = useState(null);
   const [savedFlash, setSavedFlash]   = useState(false);
   const [worldState, setWorldState]   = useState({ protagonist: "", setting: "", facts: [] });
+  const [legacy, setLegacy]           = useState(null);
   const typingRef = useRef(null);
   const namingStyleRef = useRef("");
 
@@ -119,6 +120,7 @@ Return exactly this shape:
 }
 Story parameters: Genre=${config.genre}, Theme="${config.theme || "open"}", Tone=${config.tone}, Scope=${config.scope}.${config.extra ? ` Extra context: ${config.extra}` : ""}
 Make each concept feel meaningfully different — vary settings, protagonists, or central conflicts. Each should feel exciting and distinct.
+${legacy ? `This is a ${legacy.type} to "${legacy.parentTitle}". ${legacy.type === "sequel" ? `Generate 3 concepts that directly continue from that story with the same protagonist (${legacy.worldState.protagonist}) in the same world (${legacy.worldState.setting}). Carry forward: ${(legacy.worldState.facts || []).slice(0, 4).join("; ")}.` : `Generate 3 concepts set in the same world (${legacy.worldState.setting}) but each with a brand-new protagonist — not ${legacy.worldState.protagonist}. Established lore: ${(legacy.worldState.facts || []).slice(0, 4).join("; ")}.`}` : ""}
 Naming convention: ${namingStyleRef.current}. Apply this to all character and place names — avoid generic fantasy names like Aldric, Kael, Elara, or Thornwood.`;
 
   const buildOpeningSystem = (concept) =>
@@ -136,7 +138,7 @@ Return exactly this shape:
     "facts": ["Up to 6 key facts: notable NPCs, items, threats, or plot points introduced"]
   }
 }
-Story parameters: Genre=${config.genre}, Theme="${config.theme || "open"}", Tone=${config.tone}, Scope=${config.scope}.${config.extra ? ` Extra context: ${config.extra}` : ""}${concept ? `\nChosen story concept — Title: "${concept.title}". Synopsis: "${concept.synopsis}". Build the opening passage faithfully from this concept.` : ""}
+Story parameters: Genre=${config.genre}, Theme="${config.theme || "open"}", Tone=${config.tone}, Scope=${config.scope}.${config.extra ? ` Extra context: ${config.extra}` : ""}${concept ? `\nChosen story concept — Title: "${concept.title}". Synopsis: "${concept.synopsis}". Build the opening passage faithfully from this concept.` : ""}${legacy ? `\nThis is a ${legacy.type} to "${legacy.parentTitle}". ${legacy.type === "sequel" ? `Continue with the same protagonist (${legacy.worldState.protagonist}) in the same world (${legacy.worldState.setting}). The previous story concluded: "${(legacy.endingPassage || "").slice(0, 200)}". Established facts: ${(legacy.worldState.facts || []).join("; ")}.` : `Set in the same world as the original (${legacy.worldState.setting}). Established lore: ${(legacy.worldState.facts || []).join("; ")}. Create a brand-new protagonist — do not reuse ${legacy.worldState.protagonist}.`}` : ""}
 Naming convention: ${namingStyleRef.current}. All character and place names must follow this tradition — avoid generic fantasy names (Aldric, Kael, Elara, Thornwood, etc.).
 Write with literary quality. Vary sentence rhythm. Be specific and sensory. Make choices feel genuinely consequential.`;
 
@@ -168,7 +170,7 @@ Maintain narrative consistency. Raise stakes. Honor the player's choice.`;
   };
 
   const generateOptions = async () => {
-    namingStyleRef.current = NAMING_STYLES[Math.floor(Math.random() * NAMING_STYLES.length)];
+    if (!legacy) namingStyleRef.current = NAMING_STYLES[Math.floor(Math.random() * NAMING_STYLES.length)];
     setError("");
     setScreen("loading");
     const msgs = ["Summoning story concepts…", "Consulting the ancient tomes…", "Three paths diverge before you…", "The ink stirs with possibility…"];
@@ -222,6 +224,28 @@ Maintain narrative consistency. Raise stakes. Honor the player's choice.`;
       setError(e.message || "Something went wrong. Please try again.");
       setScreen("picker");
     }
+  };
+
+  const startSequel = (source) => {
+    clearInterval(typingRef.current);
+    namingStyleRef.current = source.namingStyle || namingStyleRef.current;
+    setLegacy({ type: "sequel", parentTitle: source.title, endingPassage: source.endingPassage || source.current?.passage || "", worldState: source.worldState || {} });
+    setConfig(source.config || { genre: "", theme: "", tone: "", scope: "", extra: "" });
+    setHistory([]); setCurrent(null); setDisplayedText(""); setChapter(0);
+    setStoryTitle(""); setStoryOptions([]); setCurrentStoryId(null); setSavedFlash(false);
+    setWorldState({ protagonist: "", setting: "", facts: [] }); setError("");
+    setScreen("setup");
+  };
+
+  const startSpinoff = (source) => {
+    clearInterval(typingRef.current);
+    namingStyleRef.current = source.namingStyle || namingStyleRef.current;
+    setLegacy({ type: "spinoff", parentTitle: source.title, worldState: source.worldState || {} });
+    setConfig(source.config || { genre: "", theme: "", tone: "", scope: "", extra: "" });
+    setHistory([]); setCurrent(null); setDisplayedText(""); setChapter(0);
+    setStoryTitle(""); setStoryOptions([]); setCurrentStoryId(null); setSavedFlash(false);
+    setWorldState({ protagonist: "", setting: "", facts: [] }); setError("");
+    setScreen("setup");
   };
 
   const makeChoice = async (choice, idx) => {
@@ -307,6 +331,7 @@ Maintain narrative consistency. Raise stakes. Honor the player's choice.`;
     setCurrentStoryId(null);
     setSavedFlash(false);
     setWorldState({ protagonist: "", setting: "", facts: [] });
+    setLegacy(null);
     namingStyleRef.current = "";
     setError("");
   };
@@ -337,6 +362,16 @@ Maintain narrative consistency. Raise stakes. Honor the player's choice.`;
               <button className="library-btn" onClick={() => setScreen("library")}>
                 ✦ My Library ({library.length})
               </button>
+            )}
+
+            {legacy && (
+              <div className="legacy-banner">
+                <div className="legacy-info">
+                  <span className="legacy-type">{legacy.type === "sequel" ? "Sequel to" : "Spinoff of"}</span>
+                  <span className="legacy-parent">"{legacy.parentTitle}"</span>
+                </div>
+                <button className="legacy-clear" onClick={() => { setLegacy(null); namingStyleRef.current = ""; }}>✕</button>
+              </div>
             )}
 
             {error && <div className="error-banner">{error}</div>}
@@ -419,6 +454,10 @@ Maintain narrative consistency. Raise stakes. Honor the player's choice.`;
                       <button className="lib-continue-btn" onClick={() => loadStory(entry)}>
                         {entry.isComplete ? "Read Again" : "Continue →"}
                       </button>
+                      {entry.isComplete && (<>
+                        <button className="lib-sequel-btn" onClick={() => { startSequel({ worldState: entry.worldState, namingStyle: entry.namingStyle, title: entry.title, config: entry.config, endingPassage: entry.current.passage }); }}>+ Sequel</button>
+                        <button className="lib-sequel-btn" onClick={() => { startSpinoff({ worldState: entry.worldState, namingStyle: entry.namingStyle, title: entry.title, config: entry.config }); }}>+ Spinoff</button>
+                      </>)}
                       <button className="lib-delete-btn" onClick={() => deleteStory(entry.id)}>✕</button>
                     </div>
                   </div>
@@ -519,6 +558,10 @@ Maintain narrative consistency. Raise stakes. Honor the player's choice.`;
                 <div className="ending-sub">A tale {chapter} chapters long, shaped by your choices alone.</div>
                 <div className="ending-btns">
                   <button className="save-library-btn" onClick={saveStory}>{savedFlash ? "Saved ✓" : "Save to Library"}</button>
+                  <div className="ending-continue-row">
+                    <button className="continue-btn" onClick={() => startSequel({ worldState, namingStyle: namingStyleRef.current, title: storyTitle, config, endingPassage: current.passage })}>+ Sequel</button>
+                    <button className="continue-btn" onClick={() => startSpinoff({ worldState, namingStyle: namingStyleRef.current, title: storyTitle, config })}>+ Spinoff</button>
+                  </div>
                   <button className="play-again-btn" onClick={restart}>Begin a New Story</button>
                 </div>
               </div>

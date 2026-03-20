@@ -291,6 +291,105 @@ html, body {
   box-shadow: 0 0 18px rgba(201, 150, 12, 0.12);
 }
 
+/* ── LEGACY BANNER (setup screen) ── */
+.legacy-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border: 1px solid rgba(201, 150, 12, 0.3);
+  border-radius: 2px;
+  background: rgba(201, 150, 12, 0.06);
+  padding: 10px 16px;
+  margin-bottom: 20px;
+  animation: fadeUp 0.4s ease both;
+}
+
+.legacy-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.legacy-type {
+  font-family: 'Cinzel', serif;
+  font-size: 9px;
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  color: var(--gold);
+  opacity: 0.6;
+}
+
+.legacy-parent {
+  font-family: 'Crimson Pro', serif;
+  font-size: 15px;
+  font-style: italic;
+  color: var(--gold-light);
+}
+
+.legacy-clear {
+  background: none;
+  border: none;
+  color: var(--gold);
+  opacity: 0.4;
+  font-size: 13px;
+  cursor: pointer;
+  padding: 2px 4px;
+  transition: opacity 0.2s;
+}
+
+.legacy-clear:hover { opacity: 0.9; }
+
+/* ── SEQUEL / SPINOFF BUTTONS (ending screen) ── */
+.ending-continue-row {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+}
+
+.continue-btn {
+  padding: 10px 28px;
+  background: transparent;
+  border: 1px solid rgba(201, 150, 12, 0.28);
+  border-radius: 2px;
+  color: var(--gold);
+  font-family: 'Cinzel', serif;
+  font-size: 10px;
+  letter-spacing: 4px;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: all 0.25s;
+  opacity: 0.7;
+}
+
+.continue-btn:hover {
+  opacity: 1;
+  background: rgba(201, 150, 12, 0.08);
+  border-color: rgba(201, 150, 12, 0.55);
+}
+
+/* ── SEQUEL / SPINOFF BUTTONS (library cards) ── */
+.lib-sequel-btn {
+  background: none;
+  border: 1px solid rgba(201, 150, 12, 0.22);
+  border-radius: 2px;
+  color: var(--gold);
+  font-family: 'Cinzel', serif;
+  font-size: 8px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  padding: 6px 10px;
+  cursor: pointer;
+  transition: all 0.2s;
+  opacity: 0.55;
+  white-space: nowrap;
+}
+
+.lib-sequel-btn:hover {
+  opacity: 1;
+  border-color: rgba(201, 150, 12, 0.55);
+  background: rgba(201, 150, 12, 0.06);
+}
+
 /* ── SAVE BUTTON (story header) ── */
 .save-btn {
   background: none;

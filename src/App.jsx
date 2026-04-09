@@ -1,4 +1,5 @@
 import { useState, useRef } from "react";
+import { Analytics } from "@vercel/analytics/react";
 import "./App.css";
 
 const GENRE_OPTIONS = ["Fantasy", "Science Fiction", "Horror", "Mystery", "Romance", "Historical", "Thriller", "Mythology", "Post-Apocalyptic", "Fairy Tale"];
@@ -570,6 +571,7 @@ Maintain narrative consistency. Raise stakes. Honor the player's choice.`;
         )}
 
       </div>
+      <Analytics />
     </div>
   );
 }

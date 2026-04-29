@@ -1,4 +1,4 @@
-# ✦ Scribe
+# Scribe
 
 An AI-powered choose-your-own-adventure story engine. Players configure their genre, tone, scope, and theme — then Claude generates a completely unique, branching narrative shaped by every choice they make.
 
